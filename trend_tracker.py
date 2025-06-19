@@ -103,9 +103,13 @@ def send_notification_email(subject, html_body):
         print(f"❌ 郵件通知發送失敗！錯誤: {e}")
 
 # --- 定義主邏輯函式 ---
+# --- 步驟五：定義主邏輯函式 (已修正 gspread 授權方式) ---
 def main():
     print("🚀 [主流程開始] 準備執行所有任務...")
-    gc = gspread.service_account(credentials=creds_dict)
+    
+    # 【已修正】使用 gspread.service_account_from_dict() 來進行授權
+    gc = gspread.service_account_from_dict(creds_dict)
+    
     spreadsheet = gc.open_by_key(sheet_id)
     
     cna_articles_db = fetch_all_cna_news(CNA_FEEDS)
