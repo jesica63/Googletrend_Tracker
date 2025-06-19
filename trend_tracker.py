@@ -1,4 +1,4 @@
-# trend_tracker.py (GitHub Actions Deployment Version)
+# trend_tracker.py (v3 - with Sheet Link in Email)
 
 # --- 導入所有函式庫 ---
 import pandas as pd
@@ -12,7 +12,7 @@ import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import os # 引入 os 模組來讀取環境變數
+import os
 
 # --- 設定所有全域變數 ---
 SHEET_NAME_DASHBOARD = "最新趨勢儀表板"
@@ -76,17 +76,29 @@ def find_keyword_in_cna_news(keyword, cna_database):
             return {'title': article['title'], 'link': article['link']}
     return None
 
-def format_email_body_html(matched_items):
+# 【已修改】函式現在接收 sheet_url 參數
+def format_email_body_html(matched_items, sheet_url):
+    """將比對成功的項目格式化為 HTML 郵件內容"""
     header = "<h1>Google Trends 與中央社新聞比對成功通知</h1>"
     body = "<p>在本次執行中，以下熱門關鍵字成功在中央社新聞中找到對應內容：</p>"
     table = "<table border='1' style='border-collapse: collapse; width: 100%;'><tr><th style='padding: 8px; text-align: left;'>關鍵字</th><th style='padding: 8px; text-align: left;'>相關新聞標題</th></tr>"
     for item in matched_items:
         table += f"<tr><td style='padding: 8px;'>{item['keyword']}</td><td style='padding: 8px;'><a href='{item['cna_link']}'>{item['cna_title']}</a></td></tr>"
     table += "</table>"
-    footer = "<p>這是一封自動化通知郵件，請勿回覆。</p>"
+    # 【已修改】footer 現在包含 sheet_url
+    footer = f"""
+    <hr>
+    <p>
+        <a href="{sheet_url}">點此查看完整的 Google Sheet 歷史日誌</a>
+    </p>
+    <p style='color: #888; font-size: 12px;'>
+        這是一封自動化通知郵件，請勿回覆。
+    </p>
+    """
     return f"<html><body>{header}{body}{table}{footer}</body></html>"
 
 def send_notification_email(subject, html_body):
+    """發送郵件通知"""
     print("--- [郵件通知] 正在準備發送郵件... ---")
     message = MIMEMultipart("alternative")
     message["Subject"] = f"🚀 {subject}"
@@ -102,14 +114,10 @@ def send_notification_email(subject, html_body):
     except Exception as e:
         print(f"❌ 郵件通知發送失敗！錯誤: {e}")
 
-# --- 定義主邏輯函式 ---
-# --- 步驟五：定義主邏輯函式 (已修正 gspread 授權方式) ---
+# --- 主邏輯函式 ---
 def main():
     print("🚀 [主流程開始] 準備執行所有任務...")
-    
-    # 【已修正】使用 gspread.service_account_from_dict() 來進行授權
     gc = gspread.service_account_from_dict(creds_dict)
-    
     spreadsheet = gc.open_by_key(sheet_id)
     
     cna_articles_db = fetch_all_cna_news(CNA_FEEDS)
@@ -156,9 +164,10 @@ def main():
     write_df_to_worksheet(spreadsheet, SHEET_NAME_DASHBOARD, df_rss, f"最新趨勢儀表板 (更新時間: {update_time_str})")
     append_df_to_worksheet(spreadsheet, SHEET_NAME_LOG, df_rss)
     
+    # 【已修改】將 spreadsheet.url 傳遞給 format_email_body_html
     if matches_for_email:
-        email_subject = f"趨勢快報：{len(matches_for_email)}個熱門關鍵字在中央社找到關聯新聞！"
-        email_body = format_email_body_html(matches_for_email)
+        email_subject = f"GoogleTrend快報：{len(matches_for_email)}個熱門關鍵字在中央社找到關聯新聞！"
+        email_body = format_email_body_html(matches_for_email, spreadsheet.url)
         send_notification_email(email_subject, email_body)
     else:
         print("\n--- [郵件通知] 本次執行無成功比對項目，不發送郵件。 ---")
