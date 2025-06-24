@@ -4,3 +4,4 @@ gspread-dataframe
 google-auth-oauthlib
 openpyxl
 feedparser
+google-generativeai
