@@ -84,25 +84,21 @@ def find_keyword_in_cna_news(keyword, cna_database):
 def generate_curiosity_questions(keyword, title):
     """
     根據關鍵字和新聞標題，使用 Gemini API 生成三個讀者好奇的問題。
+    這個函式會從環境變數讀取私密的 Prompt 指令。
     """
     print(f"    - [Gemini] 正在為 '{keyword}' 生成好奇問題...")
     try:
-        prompt = f"""
-        請扮演一個台灣財經媒體的典型讀者。你的閱讀習慣是使用手機迅速滑動瀏覽新聞。你特別關注以下幾類資訊：
+        # 【修改】從環境變數讀取您的私密 Prompt 範本
+        prompt_template = os.environ.get('GEMINI_PROMPT')
 
-        1.  **個人利益相關：** 例如各種優惠、熱門股票的獲利機會、自己在法律上或政策下能享受的權利與受惠。
-        2.  **個人與國家安危相關：** 例如國家大事、全球政治緊張局勢、軍事動態、交通安全等。
-        3.  **陌生但會令你好奇的事情或字眼：** 任何引起你好奇心的新概念或事件。
+        # 如果沒有讀取到 Secret，就回傳錯誤，避免執行失敗
+        if not prompt_template:
+            print("❌ 錯誤：在環境變數中找不到 'GEMINI_PROMPT'。請檢查 GitHub Secrets 設定。")
+            return ['N/A', 'N/A', 'N/A']
 
-        現在，請根據以下提供的「關鍵字」與「新聞標題」，從上述任一或多個角度，發想出三個你會最想知道、最令你好奇的問題。
-
-        請直接列出這三個好奇問題，使用編號列表格式 (例如 1. 2. 3.)。除了問題列表，請勿包含任何其他文字。
-
-        ---
-        關鍵字：{keyword}
-        新聞標題：{title}
-        ---
-        """
+        # 【修改】使用 .format() 方法將變數填入 Prompt 範本
+        # 這樣您的公開程式碼中，就只看得到變數名稱，看不到完整的指令內容
+        prompt = prompt_template.format(keyword=keyword, title=title)
         
         model = genai.GenerativeModel('gemini-1.5-pro-latest')
         response = model.generate_content(prompt)
