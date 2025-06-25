@@ -29,5 +29,6 @@ jobs:
           EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
           EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
           EMAIL_SENDER_APP_PASSWORD: ${{ secrets.EMAIL_SENDER_APP_PASSWORD }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # 【新增這一行】
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} 
+          GEMINI_PROMPT: ${{ secrets.GEMINI_PROMPT }} # 新增這一行
         run: python trend_tracker.py
