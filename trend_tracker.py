@@ -1,4 +1,4 @@
-# trend_tracker.py (v3 - with Sheet Link in Email)
+# trend_tracker.py (v4.1 - GitHub Actions-Optimized Version)
 
 # --- 導入所有函式庫 ---
 import pandas as pd
@@ -13,6 +13,7 @@ import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
+import google.generativeai as genai # 導入 Gemini API 函式庫
 
 # --- 設定所有全域變數 ---
 SHEET_NAME_DASHBOARD = "最新趨勢儀表板"
@@ -27,10 +28,14 @@ try:
     sender_email = os.environ['EMAIL_SENDER']
     receiver_email = os.environ['EMAIL_RECEIVER']
     email_password = os.environ['EMAIL_SENDER_APP_PASSWORD']
+    gemini_api_key = os.environ['GEMINI_API_KEY'] # 讀取 Gemini API 金鑰
     print("✅ 所有密鑰從環境變數讀取成功。")
 except KeyError as e:
     print(f"❌ 讀取環境變數失敗！請確認 GitHub Secrets 已設定。缺少金鑰: {e}")
     raise
+
+# --- 設定 Gemini API ---
+genai.configure(api_key=gemini_api_key)
 
 # --- 定義所有輔助函式 ---
 def write_df_to_worksheet(spreadsheet, sheet_name, df, title_text):
@@ -76,20 +81,62 @@ def find_keyword_in_cna_news(keyword, cna_database):
             return {'title': article['title'], 'link': article['link']}
     return None
 
-# 【已修改】函式現在接收 sheet_url 參數
+def generate_curiosity_questions(keyword, title):
+    """
+    根據關鍵字和新聞標題，使用 Gemini API 生成三個讀者好奇的問題。
+    這個函式會從環境變數讀取私密的 Prompt 指令。
+    """
+    print(f"    - [Gemini] 正在為 '{keyword}' 生成好奇問題...")
+    try:
+        # 【修改】從環境變數讀取您的私密 Prompt 範本
+        prompt_template = os.environ.get('GEMINI_PROMPT')
+
+        # 如果沒有讀取到 Secret，就回傳錯誤，避免執行失敗
+        if not prompt_template:
+            print("❌ 錯誤：在環境變數中找不到 'GEMINI_PROMPT'。請檢查 GitHub Secrets 設定。")
+            return ['N/A', 'N/A', 'N/A']
+
+        # 【修改】使用 .format() 方法將變數填入 Prompt 範本
+        # 這樣您的公開程式碼中，就只看得到變數名稱，看不到完整的指令內容
+        prompt = prompt_template.format(keyword=keyword, title=title)
+        
+        model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        response = model.generate_content(prompt)
+        
+        questions_raw = response.text.strip().split('\n')
+        questions = [q.split('. ', 1)[-1].strip() for q in questions_raw if '. ' in q]
+        
+        while len(questions) < 3:
+            questions.append('N/A')
+            
+        print(f"    - [Gemini] ✅ 成功生成問題。")
+        return questions[:3]
+
+    except Exception as e:
+        print(f"    - [Gemini] ❌ 生成問題時發生錯誤: {e}")
+        return ['N/A', 'N/A', 'N/A']
+
 def format_email_body_html(matched_items, sheet_url):
     """將比對成功的項目格式化為 HTML 郵件內容"""
     header = "<h1>Google Trends 與中央社新聞比對成功通知</h1>"
-    body = "<p>在本次執行中，以下熱門關鍵字成功在中央社新聞中找到對應內容：</p>"
-    table = "<table border='1' style='border-collapse: collapse; width: 100%;'><tr><th style='padding: 8px; text-align: left;'>關鍵字</th><th style='padding: 8px; text-align: left;'>相關新聞標題</th></tr>"
+    body = "<p>在本次執行中，以下熱門關鍵字成功在中央社新聞中找到對應內容，並已生成讀者可能好奇的問題：</p>"
+    
+    table = "<table border='1' style='border-collapse: collapse; width: 100%;'><tr><th style='padding: 8px; text-align: left; width: 20%;'>關鍵字</th><th style='padding: 8px; text-align: left; width: 40%;'>相關新聞標題</th><th style='padding: 8px; text-align: left; width: 40%;'>讀者好奇的問題</th></tr>"
+    
     for item in matched_items:
-        table += f"<tr><td style='padding: 8px;'>{item['keyword']}</td><td style='padding: 8px;'><a href='{item['cna_link']}'>{item['cna_title']}</a></td></tr>"
+        questions_html = "<ul style='margin: 0; padding-left: 20px;'>"
+        for q in item.get('questions', []):
+            if q != 'N/A':
+                questions_html += f"<li>{q}</li>"
+        questions_html += "</ul>"
+        
+        table += f"<tr><td style='padding: 8px; vertical-align: top;'>{item['keyword']}</td><td style='padding: 8px; vertical-align: top;'><a href='{item['cna_link']}'>{item['cna_title']}</a></td><td style='padding: 8px; vertical-align: top;'>{questions_html}</td></tr>"
+        
     table += "</table>"
-    # 【已修改】footer 現在包含 sheet_url
     footer = f"""
     <hr>
     <p>
-        <a href="{sheet_url}">點此查看完整的 Google Sheet 歷史日誌</a>
+        <a href="{sheet_url}">點此查看完整的 Google Sheet 歷史日誌 (含所有欄位)</a>
     </p>
     <p style='color: #888; font-size: 12px;'>
         這是一封自動化通知郵件，請勿回覆。
@@ -134,6 +181,8 @@ def main():
         final_cna_link = '無'
         final_cna_title = ''
         
+        q1, q2, q3 = 'N/A', 'N/A', 'N/A'
+        
         cna_match_from_db = find_keyword_in_cna_news(entry.title, cna_articles_db)
         if cna_match_from_db:
             final_cna_link = cna_match_from_db['link']
@@ -146,7 +195,16 @@ def main():
         
         if final_cna_link != '無':
             print(f"  > [比對成功] '{entry.title}' 在中央社找到相關新聞！")
-            matches_for_email.append({'keyword': entry.title, 'cna_title': final_cna_title, 'cna_link': final_cna_link})
+            
+            questions = generate_curiosity_questions(entry.title, final_cna_title)
+            q1, q2, q3 = questions
+            
+            matches_for_email.append({
+                'keyword': entry.title, 
+                'cna_title': final_cna_title, 
+                'cna_link': final_cna_link,
+                'questions': questions
+            })
         
         rss_data.append({
             '關鍵字 (Title)': entry.title, '預估搜尋量 (Traffic)': entry.get('ht_approx_traffic', 'N/A'),
@@ -154,6 +212,9 @@ def main():
             '相關新聞標題 (Summary)': f"[{entry.get('ht_news_item_source', '無來源')}] {entry.get('ht_news_item_title', '無直接相關新聞報導')}",
             '相關新聞連結': entry.get('ht_news_item_url', '無'),
             '中央社相關新聞網址': final_cna_link, '趨勢連結 (Link)': entry.link,
+            '好奇1': q1,
+            '好奇2': q2,
+            '好奇3': q3,
         })
 
     df_rss = pd.DataFrame(rss_data)
@@ -164,7 +225,6 @@ def main():
     write_df_to_worksheet(spreadsheet, SHEET_NAME_DASHBOARD, df_rss, f"最新趨勢儀表板 (更新時間: {update_time_str})")
     append_df_to_worksheet(spreadsheet, SHEET_NAME_LOG, df_rss)
     
-    # 【已修改】將 spreadsheet.url 傳遞給 format_email_body_html
     if matches_for_email:
         email_subject = f"GoogleTrend快報：{len(matches_for_email)}個熱門關鍵字在中央社找到關聯新聞！"
         email_body = format_email_body_html(matches_for_email, spreadsheet.url)
