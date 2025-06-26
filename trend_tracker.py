@@ -148,7 +148,7 @@ def send_notification_email(subject, html_body):
     """發送郵件通知"""
     print("--- [郵件通知] 正在準備發送郵件... ---")
     message = MIMEMultipart("alternative")
-    message["Subject"] = f"🚀 {subject}"
+    message["Subject"] = f"🕵️‍♀️ {subject}"
     message["From"] = sender_email
     message["To"] = receiver_email
     message.attach(MIMEText(html_body, "html"))
