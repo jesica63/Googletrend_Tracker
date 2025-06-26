@@ -1,4 +1,4 @@
-# trend_tracker.py (v4.1 - GitHub Actions-Optimized Version)
+# trend_tracker.py (v5.0 - with Smart Search & Enhanced Logic)
 
 # --- 導入所有函式庫 ---
 import pandas as pd
@@ -28,7 +28,7 @@ try:
     sender_email = os.environ['EMAIL_SENDER']
     receiver_email = os.environ['EMAIL_RECEIVER']
     email_password = os.environ['EMAIL_SENDER_APP_PASSWORD']
-    gemini_api_key = os.environ['GEMINI_API_KEY'] # 讀取 Gemini API 金鑰
+    gemini_api_key = os.environ['GEMINI_API_KEY']
     print("✅ 所有密鑰從環境變數讀取成功。")
 except KeyError as e:
     print(f"❌ 讀取環境變數失敗！請確認 GitHub Secrets 已設定。缺少金鑰: {e}")
@@ -73,13 +73,47 @@ def fetch_all_cna_news(feed_urls):
     print(f"--- [階段一完成] 總共從中央社載入了 {len(all_articles)} 則有效新聞 ---")
     return all_articles
 
-def find_keyword_in_cna_news(keyword, cna_database):
-    sub_keywords = keyword.split()
+# 【升級版】智慧搜尋函式，加入了關聯性評分邏輯
+def find_keyword_in_cna_news(main_keyword, google_news_title, cna_database):
+    """
+    使用智慧演算法在中央社新聞中尋找高關聯性的新聞。
+    1. 優先匹配新聞標題。
+    2. 從 Google News 標題中提取輔助關鍵字，提高準確性。
+    """
+    primary_keywords = set(main_keyword.split())
+    secondary_keywords = set(google_news_title.split())
+    all_keywords = primary_keywords.union(secondary_keywords)
+
+    best_match = None
+    highest_score = 0
+
     for article in cna_database:
-        full_text = article['title'] + article['summary']
-        if all(sub_word in full_text for sub_word in sub_keywords):
-            return {'title': article['title'], 'link': article['link']}
-    return None
+        current_score = 0
+        article_title = article['title']
+        article_summary = article['summary']
+
+        # --- 關聯性評分機制 ---
+        # 1. 主要關鍵字出現在標題中：最高分 (關聯性極高)
+        if all(word in article_title for word in primary_keywords):
+            current_score = 100
+        
+        # 2. 所有關鍵字 (包含輔助詞) 都出現在標題中：次高分
+        elif all(word in article_title for word in all_keywords):
+            current_score = 80
+
+        # 3. 只有主要關鍵字出現在摘要中：低分 (避免誤判)
+        elif all(word in (article_title + article_summary) for word in primary_keywords):
+            current_score = 10
+        
+        if current_score > highest_score:
+            highest_score = current_score
+            best_match = {'title': article['title'], 'link': article['link']}
+
+    # 只有分數夠高 (代表關聯性強) 才回傳結果
+    if highest_score >= 80:
+        return best_match
+    else:
+        return None
 
 def generate_curiosity_questions(keyword, title):
     """
@@ -88,16 +122,11 @@ def generate_curiosity_questions(keyword, title):
     """
     print(f"    - [Gemini] 正在為 '{keyword}' 生成好奇問題...")
     try:
-        # 【修改】從環境變數讀取您的私密 Prompt 範本
         prompt_template = os.environ.get('GEMINI_PROMPT')
-
-        # 如果沒有讀取到 Secret，就回傳錯誤，避免執行失敗
         if not prompt_template:
             print("❌ 錯誤：在環境變數中找不到 'GEMINI_PROMPT'。請檢查 GitHub Secrets 設定。")
             return ['N/A', 'N/A', 'N/A']
 
-        # 【修改】使用 .format() 方法將變數填入 Prompt 範本
-        # 這樣您的公開程式碼中，就只看得到變數名稱，看不到完整的指令內容
         prompt = prompt_template.format(keyword=keyword, title=title)
         
         model = genai.GenerativeModel('gemini-1.5-pro-latest')
@@ -183,11 +212,15 @@ def main():
         
         q1, q2, q3 = 'N/A', 'N/A', 'N/A'
         
-        cna_match_from_db = find_keyword_in_cna_news(entry.title, cna_articles_db)
+        # 【修改】使用新的智慧搜尋函式，傳入主要關鍵字和 Google News 上下文標題
+        google_news_title = entry.get('ht_news_item_title', '')
+        cna_match_from_db = find_keyword_in_cna_news(entry.title, google_news_title, cna_articles_db)
+        
         if cna_match_from_db:
             final_cna_link = cna_match_from_db['link']
             final_cna_title = cna_match_from_db['title']
         else:
+            # 如果內部搜尋找不到，再檢查一次 Google News 是否直接提供了中央社的連結
             google_news_source = entry.get('ht_news_item_source', '')
             if '中央社' in google_news_source or 'CNA' in google_news_source:
                 final_cna_link = entry.get('ht_news_item_url', '無')
@@ -226,7 +259,8 @@ def main():
     append_df_to_worksheet(spreadsheet, SHEET_NAME_LOG, df_rss)
     
     if matches_for_email:
-        email_subject = f"GoogleTrend快報：{len(matches_for_email)}個熱門關鍵字在中央社找到關聯新聞！"
+        # 【新版郵件主旨】更能體現內容價值
+        email_subject = f"GoogleTrend洞察：{len(matches_for_email)}個熱門趨勢與讀者意圖分析"
         email_body = format_email_body_html(matches_for_email, spreadsheet.url)
         send_notification_email(email_subject, email_body)
     else:
