@@ -177,7 +177,7 @@ def send_notification_email(subject, html_body):
     """發送郵件通知"""
     print("--- [郵件通知] 正在準備發送郵件... ---")
     message = MIMEMultipart("alternative")
-    message["Subject"] = f"🕵️‍♀️ {subject}"
+    message["Subject"] = f"🎯 {subject}"
     message["From"] = sender_email
     message["To"] = receiver_email
     message.attach(MIMEText(html_body, "html"))
@@ -250,21 +250,28 @@ def main():
             '好奇3': q3,
         })
 
+        # ... (前面的程式碼) ...
     df_rss = pd.DataFrame(rss_data)
 
-    print("\n--- [階段三] 正在將所有結果寫入 Google Sheet ---")
-    update_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    write_df_to_worksheet(spreadsheet, SHEET_NAME_DASHBOARD, df_rss, f"最新趨勢儀表板 (更新時間: {update_time_str})")
-    append_df_to_worksheet(spreadsheet, SHEET_NAME_LOG, df_rss)
-    
-    if matches_for_email:
-        # 【新版郵件主旨】更能體現內容價值
-        email_subject = f"GoogleTrend洞察：{len(matches_for_email)}個熱門趨勢與讀者意圖分析"
-        email_body = format_email_body_html(matches_for_email, spreadsheet.url)
-        send_notification_email(email_subject, email_body)
+    print("\n--- [階段三] 正在準備將結果寫入 Google Sheet ---")
+
+    # 【關鍵修復】檢查 DataFrame 是否為空，如果不為空才執行寫入操作
+    if not df_rss.empty:
+        update_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        print("--> 偵測到新趨勢資料，開始寫入工作表...")
+        write_df_to_worksheet(spreadsheet, SHEET_NAME_DASHBOARD, df_rss, f"最新趨勢儀表板 (更新時間: {update_time_str})")
+        append_df_to_worksheet(spreadsheet, SHEET_NAME_LOG, df_rss)
+        
+        if matches_for_email:
+            email_subject = f"GoogleTrend洞察：{len(matches_for_email)}個熱門趨勢與讀者意圖分析"
+            email_body = format_email_body_html(matches_for_email, spreadsheet.url)
+            send_notification_email(email_subject, email_body)
+        else:
+            print("\n--- [郵件通知] 本次執行無成功比對項目，不發送郵件。 ---")
     else:
-        print("\n--- [郵件通知] 本次執行無成功比對項目，不發送郵件。 ---")
+        # 如果 df_rss 是空的，打印提示訊息，並跳過所有寫入和郵寄操作
+        print("--> Google Trends RSS 未回傳任何資料，本次不更新工作表。")
 
     print("\n🎉 全部任務執行完畢！")
     print(f"🔗 前往查看儀表板: {spreadsheet.url}")
