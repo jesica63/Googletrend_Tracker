@@ -59,18 +59,39 @@ def append_df_to_worksheet(spreadsheet, sheet_name, df):
     print(f"✅ 成功將資料附加到工作表 '{sheet_name}' (日誌模式)。")
 
 def fetch_all_cna_news(feed_urls):
+    """
+    抓取所有中央社 RSS Feeds 的新聞，並過濾掉特定關鍵字。
+    """
     print("--- [階段一] 正在預先抓取所有中央社 RSS Feeds ---")
     all_articles = []
+    # --- 新增：定義您不想看到的關鍵字 ---
+    uninteresting_keywords = ['今彩', '大樂透', '發票', '威力彩', '樂透彩'] # 您可以根據需要繼續添加
+
     for category, url in feed_urls.items():
         try:
             feed = feedparser.parse(url)
             if feed.bozo: print(f"    - [警告] Feed '{category}' 格式可能不完整或有誤。")
+            
             for entry in feed.entries:
                 if hasattr(entry, 'title') and hasattr(entry, 'link'):
-                    all_articles.append({'title': entry.title, 'summary': entry.get('summary', ''), 'link': entry.link})
+                    article_title = entry.title
+                    
+                    # --- 新增：檢查標題是否包含不感興趣的關鍵字 ---
+                    is_uninteresting = False
+                    for keyword in uninteresting_keywords:
+                        if keyword in article_title:
+                            is_uninteresting = True
+                            break # 找到一個不感興趣的關鍵字就停止檢查，直接跳過這篇文章
+                    
+                    if not is_uninteresting:
+                        all_articles.append({'title': article_title, 'summary': entry.get('summary', ''), 'link': entry.link})
+                    else:
+                        print(f"    - [過濾] 跳過標題包含不感興趣關鍵字的新聞: \"{article_title}\"")
+
         except Exception as e:
             print(f"  > 讀取 [{category}] 失敗: {e}")
-    print(f"--- [階段一完成] 總共從中央社載入了 {len(all_articles)} 則有效新聞 ---")
+            
+    print(f"--- [階段一完成] 總共從中央社載入了 {len(all_articles)} 則有效新聞 (已過濾不感興趣內容) ---")
     return all_articles
 
 # 【升級版】智慧搜尋函式，加入了關聯性評分邏輯
