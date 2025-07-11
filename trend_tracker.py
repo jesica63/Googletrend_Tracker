@@ -195,19 +195,26 @@ def format_email_body_html(matched_items, sheet_url):
     return f"<html><body>{header}{body}{table}{footer}</body></html>"
 
 def send_notification_email(subject, html_body):
-    """發送郵件通知"""
+    """發送郵件通知，支援多個收件人"""
     print("--- [郵件通知] 正在準備發送郵件... ---")
     message = MIMEMultipart("alternative")
-    message["Subject"] = f"🎯 {subject}"
+    message["Subject"] = f"💡 {subject}" 
     message["From"] = sender_email
-    message["To"] = receiver_email
+    
+    # 這裡 receiver_email 依然是完整的字串，用於郵件標頭的顯示
+    message["To"] = receiver_email 
+    
     message.attach(MIMEText(html_body, "html"))
     context = ssl.create_default_context()
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
             server.login(sender_email, email_password)
-            server.sendmail(sender_email, receiver_email, message.as_string())
-        print("✅ 郵件通知發送成功！")
+            
+            # 【關鍵修改】將字串分割成一個 list，這才是 sendmail 函式真正需要的格式
+            receiver_email_list = receiver_email.split(',')
+            
+            server.sendmail(sender_email, receiver_email_list, message.as_string())
+        print(f"✅ 郵件通知發送成功！收件人: {receiver_email_list}")
     except Exception as e:
         print(f"❌ 郵件通知發送失敗！錯誤: {e}")
 
