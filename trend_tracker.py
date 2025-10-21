@@ -150,7 +150,7 @@ def generate_curiosity_questions(keyword, title):
 
         prompt = prompt_template.format(keyword=keyword, title=title)
         
-        model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        model = genai.GenerativeModel('gemini-2.0-flash-lite')
         response = model.generate_content(prompt)
         
         questions_raw = response.text.strip().split('\n')
