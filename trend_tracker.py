@@ -201,8 +201,8 @@ def find_keyword_in_ettoday_news(main_keyword, google_news_title, ettoday_databa
             best_match = {'title': article['title'], 'link': article['link']}
 
     # 只有分數夠高 (代表關聯性強) 才回傳結果
-    # 將閾值設定為 80，意味著至少要滿足「所有關鍵字都在標題中」
-    if highest_score >= 80:
+    # 將閾值設定為 75，增加匹配率 (可接受等級3的部分匹配)
+    if highest_score >= 75:
         print(f"      - [智慧搜尋] 找到高關聯匹配 (分數: {highest_score}) -> {best_match['title']}")
         return best_match
     else:
