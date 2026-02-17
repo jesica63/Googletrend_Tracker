@@ -2,7 +2,7 @@
 ### English Summary
 This is an automated Python script that tracks Top 10 trending keywords from Google Trends for the Taiwan region. It cross-references these keywords with real-time news from ETtoday News to identify the potential stories behind the trends. When a match is found, it sends an email notification and archives the results to Google Sheets.
 
-**Key Technologies:** `Python`, `Google Trends RSS`, `Feedparser`, `GSpread`, `GitHub Actions`, `Gemini AI`
+**Key Technologies:** `Python`, `Google Trends RSS`, `Feedparser`, `GSpread`, `GitHub Actions`, `Gemini AI (gemini-2.5-flash-lite)`
 ---
 # 🚀 Google Trends 台灣地區趨勢追蹤器 (Google Trends Tracker for Taiwan)
 
@@ -20,7 +20,7 @@ This is an automated Python script that tracks Top 10 trending keywords from Goo
     *   優先匹配完整詞組，準確度提升至 75-85%
     *   自動與預先載入的 **ETtoday 多分類新聞資料庫**進行智慧關鍵字比對
     *   支援調試信息，顯示每次匹配的分數
-*   **AI 生成讀者好奇問題**：使用 Gemini AI 自動生成讀者可能好奇的三個問題
+*   **AI 生成讀者好奇問題**：使用 Gemini AI（已升級至 `gemini-2.5-flash-lite` 模型）自動生成讀者可能好奇的三個問題
 *   **統一郵件通知**：只要找到與 ETtoday 的關聯，就會觸發郵件通知，並將所有成功匹配的結果匯總在一封郵件中。
 *   **雙工作表歸檔 (Dual-Sheet Archiving)**：
     *   **最新趨勢儀表板**：一個永遠只顯示最新一輪執行結果的乾淨儀表板。
@@ -43,7 +43,7 @@ This is an automated Python script that tracks Top 10 trending keywords from Goo
     e. **等級 4 (60分)**：完整詞組在摘要中
     f. **等級 5 (20分)**：拆分詞在標題+摘要中
     g. 如果自建資料庫未找到，則檢查 Google 是否直接提供了來源為「ETtoday」的新聞
-4.  **AI 生成好奇問題**：對於成功匹配的新聞，使用 Gemini AI 生成三個讀者可能好奇的問題
+4.  **AI 生成好奇問題**：對於成功匹配的新聞，使用 Gemini AI（`gemini-2.5-flash-lite`）生成三個讀者可能好奇的問題
 5.  **觸發郵件通知**：只要在步驟 3 中有任何一個比對成功，該項目就會被加入待發送的郵件列表中。
 6.  **寫入 Google Sheet**：將本次執行的所有結果，同時以「清空後寫入」的方式更新儀表板，並以「附加」的方式寫入歷史日誌。
 7.  **發送郵件**：如果郵件列表不為空，則將所有成功匹配的項目格式化成一封摘要郵件，並發送出去。
