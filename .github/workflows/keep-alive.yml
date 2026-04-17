@@ -1,0 +1,27 @@
+name: Keep Alive
+
+on:
+  schedule:
+    - cron: '0 0 1 * *' # 每月 1 號午夜執行，確保 repo 保持活躍
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Update keep-alive timestamp
+        run: |
+          echo "Last keep-alive: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > .github/keep-alive.txt
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/keep-alive.txt
+          git diff --staged --quiet || git commit -m "chore: keep workflows alive [skip ci]"
+          git push
